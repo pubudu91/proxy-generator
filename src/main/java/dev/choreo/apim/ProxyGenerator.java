@@ -37,6 +37,12 @@ public class ProxyGenerator {
         TextDocumentChange docChange = TextDocumentChange.from(List.of(edit).toArray(new TextEdit[0]));
         TextDocument modified = doc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(modified.toString()).apply();
+
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer();
+        docChange = transformer.modifyDoc(updatedServiceDoc);
+        modified = modified.apply(docChange);
+        updatedServiceDoc = updatedServiceDoc.modify().withContent(modified.toString()).apply();
+
         writeToFile(updatedServiceDoc);
     }
 
