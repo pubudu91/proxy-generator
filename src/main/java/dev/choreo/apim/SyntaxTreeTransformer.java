@@ -1,5 +1,24 @@
+/*
+ * Copyright (c) 2022, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *
+ * WSO2 Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package dev.choreo.apim;
 
+import io.ballerina.compiler.syntax.tree.FunctionBodyBlockNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ModuleMemberDeclarationNode;
@@ -48,6 +67,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         functionDefinitionNode.functionSignature().accept(this);
+        functionDefinitionNode.functionBody().accept(this);
     }
 
     @Override
@@ -66,5 +86,22 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         TextRange returnTypeRange = returnType.type().textRange();
         TextEdit newReturnType = TextEdit.from(returnTypeRange, "error?");
         edits.add(newReturnType);
+    }
+
+    @Override
+    public void visit(FunctionBodyBlockNode funcBody) {
+        TextRange start = TextRange.from(funcBody.openBraceToken().textRange().endOffset(), 0);
+        String code = "do {\n" +
+                "\t\t// call_inflow { }\n" +
+                "http:Response res = check cl->get(\"...\", incomingReq);\n" +
+                "// call_outflow { }\n" +
+                "check caller->respond(res);\n" +
+                "} on fail var e {\n" +
+                "\thttp:Response errorRes = createDefaultErrorResponse();\n" +
+                "\t// call_error_flow{ };\n" +
+                "\tcheck caller->respond(errorRes);\n" +
+                "}";
+        TextEdit body = TextEdit.from(start, code);
+        edits.add(body);
     }
 }
