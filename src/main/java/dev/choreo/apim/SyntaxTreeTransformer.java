@@ -90,17 +90,17 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
     @Override
     public void visit(FunctionBodyBlockNode funcBody) {
-        TextRange start = TextRange.from(funcBody.openBraceToken().textRange().endOffset(), 0);
-        String code = "do {\n" +
-                "\t\t// call_inflow { }\n" +
-                "http:Response res = check cl->get(\"...\", incomingReq);\n" +
-                "// call_outflow { }\n" +
-                "check caller->respond(res);\n" +
-                "} on fail var e {\n" +
-                "\thttp:Response errorRes = createDefaultErrorResponse();\n" +
-                "\t// call_error_flow{ };\n" +
-                "\tcheck caller->respond(errorRes);\n" +
-                "}";
+        TextRange start = TextRange.from(funcBody.closeBraceToken().textRange().startOffset(), 0);
+        String code = "\tdo {\n" +
+                "\t\t\t// call_inflow { }\n" +
+                "\t\t\thttp:Response res = check cl->get(\"...\", incomingReq);\n" +
+                "\t\t\t// call_outflow { }\n" +
+                "\t\t\tcheck caller->respond(res);\n" +
+                "\t\t} on fail var e {\n" +
+                "\t\t\thttp:Response errorRes = createDefaultErrorResponse();\n" +
+                "\t\t\t// call_error_flow{ };\n" +
+                "\t\t\tcheck caller->respond(errorRes);\n" +
+                "\t\t}\n\t";
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
     }
