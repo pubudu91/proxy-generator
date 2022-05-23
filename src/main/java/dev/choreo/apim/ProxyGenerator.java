@@ -30,8 +30,11 @@ import io.ballerina.tools.text.TextEdit;
 import io.ballerina.tools.text.TextLine;
 import io.ballerina.tools.text.TextRange;
 
+import java.io.BufferedReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,18 +51,16 @@ public class ProxyGenerator {
         Project project = loadProject("pizza_shack");
         Module module = project.currentPackage().getDefaultModule();
         Document serviceDoc = getOpenAPIGeneratedService(module);
-        TextDocument doc = serviceDoc.textDocument();
-        TextLine line = getLastLineInFile(serviceDoc.textDocument());
-        TextRange textRange = TextRange.from(line.endOffset(), 0);
-        TextEdit edit = TextEdit.from(textRange, "\nhttp:Client backendEP = check new(\"http://localhost:9090\");");
-        TextDocumentChange docChange = TextDocumentChange.from(List.of(edit).toArray(new TextEdit[0]));
-        TextDocument modified = doc.apply(docChange);
-        Document updatedServiceDoc = serviceDoc.modify().withContent(modified.toString()).apply();
+        TextDocument txtDoc = serviceDoc.textDocument();
+
+        TextDocumentChange docChange = getCodeSnippets(serviceDoc);
+        txtDoc = txtDoc.apply(docChange);
+        Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
         SyntaxTreeTransformer transformer = new SyntaxTreeTransformer();
         docChange = transformer.modifyDoc(updatedServiceDoc);
-        modified = modified.apply(docChange);
-        updatedServiceDoc = updatedServiceDoc.modify().withContent(modified.toString()).apply();
+        txtDoc = txtDoc.apply(docChange);
+        updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
         writeToFile(updatedServiceDoc);
     }
@@ -104,5 +105,26 @@ public class ProxyGenerator {
         }
 
         return doc.line(lastLine - 1);
+    }
+
+    private static TextDocumentChange getCodeSnippets(Document doc) {
+        StringBuilder builder = new StringBuilder();
+        InputStream boilerplate = ProxyGenerator.class.getClassLoader().getResourceAsStream(
+                "code-snippets/boilerplate.bal");
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(boilerplate))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line).append('\n');
+            }
+            boilerplate.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        TextLine line = getLastLineInFile(doc.textDocument());
+        TextRange textRange = TextRange.from(line.endOffset(), 0);
+        TextEdit edit = TextEdit.from(textRange, builder.toString());
+        return TextDocumentChange.from(new TextEdit[]{edit});
     }
 }
