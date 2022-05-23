@@ -41,6 +41,7 @@ import java.util.List;
 public class SyntaxTreeTransformer extends NodeVisitor {
 
     private List<TextEdit> edits;
+    private String functionName;
 
     public TextDocumentChange modifyDoc(Document document) {
         edits = new ArrayList<>();
@@ -68,8 +69,10 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
     @Override
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
+        this.functionName = functionDefinitionNode.functionName().text();
         functionDefinitionNode.functionSignature().accept(this);
         functionDefinitionNode.functionBody().accept(this);
+        this.functionName = null;
     }
 
     @Override
@@ -98,7 +101,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
         String code = doBlock
                         .addStatement("// call_inflow { }")
-                        .addStatement("http:Response res = check cl->get(\\\"...\\\", incomingReq);")
+                        .addStatement(getBackendHTTPCall(this.functionName))
                         .addStatement("// call_outflow { }")
                         .addStatement("check caller->respond(res);")
                         .addStatementToOnFail("http:Response errorRes = createDefaultErrorResponse();")
@@ -107,5 +110,14 @@ public class SyntaxTreeTransformer extends NodeVisitor {
                         .build();
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
+    }
+
+    private String getBackendHTTPCall(String functionName) {
+        if ("get".equalsIgnoreCase(functionName)
+                || "head".equalsIgnoreCase(functionName)
+                || "options".equalsIgnoreCase(functionName)) {
+            return String.format("http:Response res = check backendEP->%s(\"...\");", this.functionName);
+        }
+        return String.format("http:Response res = check backendEP->%s(\"...\", incomingReq);", this.functionName);
     }
 }
