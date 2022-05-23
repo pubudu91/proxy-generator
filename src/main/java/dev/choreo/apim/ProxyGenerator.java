@@ -44,7 +44,7 @@ public class ProxyGenerator {
 
     public static void main(String[] args) throws IOException {
         System.setProperty("ballerina.home",
-                           "/Users/pubuduf/software/ballerina-2201.0.0-swan-lake/distributions/ballerina-2201.0.3");
+                           String.format("%s/distributions/ballerina-2201.0.3", System.getenv("BALLERINA_HOME")));
         Project project = loadProject("pizza_shack");
         Module module = project.currentPackage().getDefaultModule();
         Document serviceDoc = getOpenAPIGeneratedService(module);

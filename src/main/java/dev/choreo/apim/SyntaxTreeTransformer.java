@@ -18,6 +18,7 @@
 
 package dev.choreo.apim;
 
+import dev.choreo.apim.code.builders.DoBlock;
 import io.ballerina.compiler.syntax.tree.FunctionBodyBlockNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
@@ -29,6 +30,7 @@ import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.projects.Document;
+import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextDocumentChange;
 import io.ballerina.tools.text.TextEdit;
 import io.ballerina.tools.text.TextRange;
@@ -90,17 +92,19 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
     @Override
     public void visit(FunctionBodyBlockNode funcBody) {
-        TextRange start = TextRange.from(funcBody.closeBraceToken().textRange().startOffset(), 0);
-        String code = "\tdo {\n" +
-                "\t\t\t// call_inflow { }\n" +
-                "\t\t\thttp:Response res = check cl->get(\"...\", incomingReq);\n" +
-                "\t\t\t// call_outflow { }\n" +
-                "\t\t\tcheck caller->respond(res);\n" +
-                "\t\t} on fail var e {\n" +
-                "\t\t\thttp:Response errorRes = createDefaultErrorResponse();\n" +
-                "\t\t\t// call_error_flow{ };\n" +
-                "\t\t\tcheck caller->respond(errorRes);\n" +
-                "\t\t}\n\t";
+        LineRange closingBraceLR = funcBody.closeBraceToken().lineRange();
+        TextRange closingBraceTR = funcBody.closeBraceToken().textRange();
+        TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
+        DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
+        String code = doBlock
+                        .addStatement("// call_inflow { }")
+                        .addStatement("http:Response res = check cl->get(\\\"...\\\", incomingReq);")
+                        .addStatement("// call_outflow { }")
+                        .addStatement("check caller->respond(res);")
+                        .addStatementToOnFail("http:Response errorRes = createDefaultErrorResponse();")
+                        .addStatementToOnFail("// call_error_flow{ };")
+                        .addStatementToOnFail("check caller->respond(errorRes);")
+                        .build();
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
     }
