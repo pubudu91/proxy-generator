@@ -41,17 +41,21 @@ import java.util.List;
 public class SyntaxTreeTransformer extends NodeVisitor {
 
     private final String inflowTemplate;
+    private final String outflowTemplate;
     private List<TextEdit> edits;
     private List<String> policies;
+    private List<String> outflowPolicies;
     private String functionName;
 
-    public SyntaxTreeTransformer(String inflowTemplate) {
+    public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate) {
         this.inflowTemplate = inflowTemplate;
+        this.outflowTemplate = outflowTemplate;
     }
 
-    public TextDocumentChange modifyDoc(Document document, List<String> policies) {
+    public TextDocumentChange modifyDoc(Document document, List<String> policies, List<String> outflowPolicies) {
         this.edits = new ArrayList<>();
         this.policies = policies;
+        this.outflowPolicies = outflowPolicies;
         document.syntaxTree().rootNode().accept(this);
         return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
     }
@@ -109,7 +113,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         String code = doBlock
                         .addStatement(generateInflow())
                         .addStatement(getBackendHTTPCall(this.functionName))
-                        .addStatement("// call_outflow { }")
+                        .addStatement(generateOutflow())
                         .addStatement("check caller->respond(res);")
                         .addStatementToOnFail("http:Response errorRes = createDefaultErrorResponse();")
                         .addStatementToOnFail("// call_error_flow{ };")
@@ -130,12 +134,23 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         return builder.toString();
     }
 
+    private String generateOutflow() {
+        StringBuilder builder = new StringBuilder();
+
+        for (String policy : this.outflowPolicies) {
+            String fnCall = String.format("%s(res, incomingReq)", policy);
+            builder.append(String.format(this.outflowTemplate, fnCall)).append('\n');
+        }
+
+        return builder.toString();
+    }
+
     private String getBackendHTTPCall(String functionName) {
         if ("get".equalsIgnoreCase(functionName)
                 || "head".equalsIgnoreCase(functionName)
                 || "options".equalsIgnoreCase(functionName)) {
-            return String.format("http:Response res = check backendEP->%s(\"...\");", this.functionName);
+            return String.format("http:Response res = check backendEP->%s(\"...\");\n", this.functionName);
         }
-        return String.format("http:Response res = check backendEP->%s(\"...\", incomingReq);", this.functionName);
+        return String.format("http:Response res = check backendEP->%s(\"...\", incomingReq);\n", this.functionName);
     }
 }

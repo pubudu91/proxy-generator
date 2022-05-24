@@ -57,8 +57,8 @@ public class ProxyGenerator {
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
-        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate());
-        docChange = transformer.modifyDoc(updatedServiceDoc, List.of("fooMediate", "barMediate"));
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate());
+        docChange = transformer.modifyDoc(updatedServiceDoc, List.of("fooInMediate"), List.of("fooOutMediate"));
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
@@ -108,37 +108,31 @@ public class ProxyGenerator {
     }
 
     private static TextDocumentChange getCodeSnippets(Document doc) {
-        StringBuilder builder = new StringBuilder();
-        InputStream boilerplate = ProxyGenerator.class.getClassLoader().getResourceAsStream(
-                "code-snippets/boilerplate.bal");
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(boilerplate))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line).append('\n');
-            }
-            boilerplate.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
+        String content = readFile("code-snippets/boilerplate.bal");
         TextLine line = getLastLineInFile(doc.textDocument());
         TextRange textRange = TextRange.from(line.endOffset(), 0);
-        TextEdit edit = TextEdit.from(textRange, builder.toString());
+        TextEdit edit = TextEdit.from(textRange, content);
         return TextDocumentChange.from(new TextEdit[]{edit});
     }
 
     private static String getInflowTemplate() {
-        StringBuilder builder = new StringBuilder();
-        InputStream inflow = ProxyGenerator.class.getClassLoader()
-                .getResourceAsStream("code-snippets/inflow_template.bal");
+        return readFile("code-snippets/inflow_template.bal");
+    }
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inflow))) {
+    private static String getOutflowTemplate() {
+        return readFile("code-snippets/outflow_template.bal");
+    }
+
+    private static String readFile(String filePath) {
+        StringBuilder builder = new StringBuilder();
+        InputStream fileStream = ProxyGenerator.class.getClassLoader().getResourceAsStream(filePath);
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 builder.append(line).append('\n');
             }
-            inflow.close();
+            fileStream.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
