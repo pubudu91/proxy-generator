@@ -40,13 +40,20 @@ import java.util.List;
 
 public class SyntaxTreeTransformer extends NodeVisitor {
 
+    private final String inflowTemplate;
     private List<TextEdit> edits;
+    private List<String> policies;
     private String functionName;
 
-    public TextDocumentChange modifyDoc(Document document) {
-        edits = new ArrayList<>();
+    public SyntaxTreeTransformer(String inflowTemplate) {
+        this.inflowTemplate = inflowTemplate;
+    }
+
+    public TextDocumentChange modifyDoc(Document document, List<String> policies) {
+        this.edits = new ArrayList<>();
+        this.policies = policies;
         document.syntaxTree().rootNode().accept(this);
-        return TextDocumentChange.from(edits.toArray(new TextEdit[0]));
+        return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
     }
 
     @Override
@@ -78,8 +85,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String edit = functionSignature.parameters().isEmpty() ? "http:Caller caller, http:Request incomingReq" :
-                "http:Caller caller, http:Request incomingReq, ";
+        String edit = functionSignature.parameters().isEmpty() ?
+                "http:Caller caller, http:Request incomingReq" : "http:Caller caller, http:Request incomingReq, ";
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);
 
@@ -100,7 +107,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
         DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
         String code = doBlock
-                        .addStatement("// call_inflow { }")
+                        .addStatement(generateInflow())
                         .addStatement(getBackendHTTPCall(this.functionName))
                         .addStatement("// call_outflow { }")
                         .addStatement("check caller->respond(res);")
@@ -110,6 +117,17 @@ public class SyntaxTreeTransformer extends NodeVisitor {
                         .build();
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
+    }
+
+    private String generateInflow() {
+        StringBuilder builder = new StringBuilder();
+
+        for (String policy : this.policies) {
+            String fnCall = String.format("%s(incomingReq)", policy);
+            builder.append(String.format(this.inflowTemplate, fnCall)).append('\n');
+        }
+
+        return builder.toString();
     }
 
     private String getBackendHTTPCall(String functionName) {

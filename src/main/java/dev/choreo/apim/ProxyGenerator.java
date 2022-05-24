@@ -57,8 +57,8 @@ public class ProxyGenerator {
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
-        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer();
-        docChange = transformer.modifyDoc(updatedServiceDoc);
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate());
+        docChange = transformer.modifyDoc(updatedServiceDoc, List.of("fooMediate", "barMediate"));
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
@@ -126,5 +126,23 @@ public class ProxyGenerator {
         TextRange textRange = TextRange.from(line.endOffset(), 0);
         TextEdit edit = TextEdit.from(textRange, builder.toString());
         return TextDocumentChange.from(new TextEdit[]{edit});
+    }
+
+    private static String getInflowTemplate() {
+        StringBuilder builder = new StringBuilder();
+        InputStream inflow = ProxyGenerator.class.getClassLoader()
+                .getResourceAsStream("code-snippets/inflow_template.bal");
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inflow))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line).append('\n');
+            }
+            inflow.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return builder.toString();
     }
 }
