@@ -1,4 +1,4 @@
-do {
+{
     var x = check %s;
 
     if x is false {

@@ -21,9 +21,33 @@ listener http:Listener ep0 = new (8243, config = {host: "localhost"});
 service /pizzashack/'1\.0\.0 on ep0 {
     resource function post 'order(http:Caller caller, http:Request incomingReq, @http:Payload json p) returns error? {
         do {
-            // call_inflow { }
-            http:Response res = check cl->get("...", incomingReq);
-            // call_outflow { }
+            {
+                var x = check fooInMediate(incomingReq);
+
+                if x is false {
+                    http:Response res1 = createAcceptedResponse();
+                    http:ListenerError? response = caller->respond(res1);
+                    return;
+                } else if x is http:Response {
+                    http:ListenerError? response = caller->respond(x);
+                    return;
+                }
+            }
+
+            http:Response res = check backendEP->post("...", incomingReq);
+
+            {
+                var x = check fooOutMediate(res, incomingReq);
+
+                if x is false {
+                    // handle stopping mediation midway
+                    return;
+                } else if x is http:Response {
+                    http:ListenerError? response = caller->respond(x);
+                    return;
+                }
+            }
+
             check caller->respond(res);
         } on fail var e {
             http:Response errorRes = createDefaultErrorResponse();
@@ -34,4 +58,12 @@ service /pizzashack/'1\.0\.0 on ep0 {
 }
 
 http:Client backendEP = check new ("http://localhost:9090");
+
+function createDefaultErrorResponse() returns http:Response {
+    return new;
+}
+
+function createAcceptedResponse() returns http:Response {
+    return new;
+}
 ```
