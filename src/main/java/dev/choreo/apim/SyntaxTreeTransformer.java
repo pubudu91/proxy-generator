@@ -43,6 +43,8 @@ import static dev.choreo.apim.Names.BACKEND_RESPONSE;
 import static dev.choreo.apim.Names.CALLER;
 import static dev.choreo.apim.Names.ERROR_FLOW_RESPONSE;
 import static dev.choreo.apim.Names.INCOMING_REQUEST;
+import static dev.choreo.apim.Names.UPDATED_HEADERS;
+import static java.lang.String.format;
 
 public class SyntaxTreeTransformer extends NodeVisitor {
 
@@ -95,7 +97,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String paramSignature = String.format("http:Caller %s, http:Request %s", CALLER, Names.INCOMING_REQUEST);
+        String paramSignature = format("http:Caller %s, http:Request %s", CALLER, Names.INCOMING_REQUEST);
         String edit = functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);
@@ -120,11 +122,10 @@ public class SyntaxTreeTransformer extends NodeVisitor {
                 .addStatement(generateInflow())
                 .addStatement(getBackendHTTPCall(this.functionName))
                 .addStatement(generateOutflow())
-                .addStatement(String.format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
-                .addStatementToOnFail(
-                        String.format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
+                .addStatement(format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
+                .addStatementToOnFail(format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
                 .addStatementToOnFail("// call_error_flow{ };")
-                .addStatementToOnFail(String.format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
+                .addStatementToOnFail(format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
                 .build();
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
@@ -134,8 +135,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         StringBuilder builder = new StringBuilder();
 
         for (String policy : this.policies) {
-            String fnCall = String.format("%s(%s)", policy, INCOMING_REQUEST);
-            builder.append(String.format(this.inflowTemplate, fnCall)).append('\n');
+            String fnCall = format("%s(%s)", policy, INCOMING_REQUEST);
+            builder.append(format(this.inflowTemplate, fnCall)).append('\n');
         }
 
         return builder.toString();
@@ -145,8 +146,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         StringBuilder builder = new StringBuilder();
 
         for (String policy : this.outflowPolicies) {
-            String fnCall = String.format("%s(%s, %s)", policy, BACKEND_RESPONSE, INCOMING_REQUEST);
-            builder.append(String.format(this.outflowTemplate, fnCall)).append('\n');
+            String fnCall = format("%s(%s, %s)", policy, BACKEND_RESPONSE, INCOMING_REQUEST);
+            builder.append(format(this.outflowTemplate, fnCall)).append('\n');
         }
 
         return builder.toString();
@@ -156,10 +157,15 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         if ("get".equalsIgnoreCase(functionName)
                 || "head".equalsIgnoreCase(functionName)
                 || "options".equalsIgnoreCase(functionName)) {
-            return String.format("http:Response %s = check %s->%s(\"...\");\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                                 this.functionName);
+            StringBuilder builder = new StringBuilder();
+            builder.append(format("map<string|string[]> %s = copyRequestHeaders(%s);\n", UPDATED_HEADERS,
+                                  INCOMING_REQUEST));
+            builder.append(format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
+                                  this.functionName, UPDATED_HEADERS));
+            return builder.toString();
         }
-        return String.format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                             this.functionName, INCOMING_REQUEST);
+
+        return format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
+                      this.functionName, INCOMING_REQUEST);
     }
 }
