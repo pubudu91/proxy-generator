@@ -38,6 +38,12 @@ import io.ballerina.tools.text.TextRange;
 import java.util.ArrayList;
 import java.util.List;
 
+import static dev.choreo.apim.Names.BACKEND_ENDPOINT;
+import static dev.choreo.apim.Names.BACKEND_RESPONSE;
+import static dev.choreo.apim.Names.CALLER;
+import static dev.choreo.apim.Names.ERROR_FLOW_RESPONSE;
+import static dev.choreo.apim.Names.INCOMING_REQUEST;
+
 public class SyntaxTreeTransformer extends NodeVisitor {
 
     private final String inflowTemplate;
@@ -89,8 +95,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String edit = functionSignature.parameters().isEmpty() ?
-                "http:Caller caller, http:Request incomingReq" : "http:Caller caller, http:Request incomingReq, ";
+        String paramSignature = String.format("http:Caller %s, http:Request %s", CALLER, Names.INCOMING_REQUEST);
+        String edit = functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);
 
@@ -111,14 +117,15 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
         DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
         String code = doBlock
-                        .addStatement(generateInflow())
-                        .addStatement(getBackendHTTPCall(this.functionName))
-                        .addStatement(generateOutflow())
-                        .addStatement("check caller->respond(res);")
-                        .addStatementToOnFail("http:Response errorRes = createDefaultErrorResponse();")
-                        .addStatementToOnFail("// call_error_flow{ };")
-                        .addStatementToOnFail("check caller->respond(errorRes);")
-                        .build();
+                .addStatement(generateInflow())
+                .addStatement(getBackendHTTPCall(this.functionName))
+                .addStatement(generateOutflow())
+                .addStatement(String.format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
+                .addStatementToOnFail(
+                        String.format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
+                .addStatementToOnFail("// call_error_flow{ };")
+                .addStatementToOnFail(String.format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
+                .build();
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
     }
@@ -127,7 +134,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         StringBuilder builder = new StringBuilder();
 
         for (String policy : this.policies) {
-            String fnCall = String.format("%s(incomingReq)", policy);
+            String fnCall = String.format("%s(%s)", policy, INCOMING_REQUEST);
             builder.append(String.format(this.inflowTemplate, fnCall)).append('\n');
         }
 
@@ -138,7 +145,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         StringBuilder builder = new StringBuilder();
 
         for (String policy : this.outflowPolicies) {
-            String fnCall = String.format("%s(res, incomingReq)", policy);
+            String fnCall = String.format("%s(%s, %s)", policy, BACKEND_RESPONSE, INCOMING_REQUEST);
             builder.append(String.format(this.outflowTemplate, fnCall)).append('\n');
         }
 
@@ -149,8 +156,10 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         if ("get".equalsIgnoreCase(functionName)
                 || "head".equalsIgnoreCase(functionName)
                 || "options".equalsIgnoreCase(functionName)) {
-            return String.format("http:Response res = check backendEP->%s(\"...\");\n", this.functionName);
+            return String.format("http:Response %s = check %s->%s(\"...\");\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
+                                 this.functionName);
         }
-        return String.format("http:Response res = check backendEP->%s(\"...\", incomingReq);\n", this.functionName);
+        return String.format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
+                             this.functionName, INCOMING_REQUEST);
     }
 }
