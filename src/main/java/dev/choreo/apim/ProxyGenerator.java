@@ -46,8 +46,7 @@ public class ProxyGenerator {
     private static final Path WORKING_DIR = Paths.get("/Users/pubuduf/poc/mediation-gen");
 
     public static void main(String[] args) throws IOException {
-        System.setProperty("ballerina.home",
-                           String.format("%s/distributions/ballerina-2201.0.3", System.getenv("BALLERINA_HOME")));
+        setBallerinaHomeDistribution();
         Project project = loadProject("pizza_shack");
         Module module = project.currentPackage().getDefaultModule();
         Document serviceDoc = getOpenAPIGeneratedService(module);
@@ -63,6 +62,26 @@ public class ProxyGenerator {
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
         writeToFile(updatedServiceDoc);
+    }
+
+    private static void setBallerinaHomeDistribution() {
+        ProcessBuilder builder = new ProcessBuilder();
+        builder.command(System.getenv("SHELL"), "-c", "bal home");
+
+        try {
+            Process process = builder.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String balHome = reader.readLine();
+            int exitVal = process.waitFor();
+
+            if (exitVal != 0) {
+                throw new RuntimeException("'bal home' command exited unexpectedly");
+            }
+
+            System.setProperty("ballerina.home", balHome);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static void writeToFile(Document doc) throws IOException {
