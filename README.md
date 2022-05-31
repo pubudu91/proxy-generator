@@ -22,7 +22,7 @@ service /pizzashack/'1\.0\.0 on ep0 {
     resource function post 'order(http:Caller caller, http:Request incomingReq, @http:Payload json p) returns error? {
         do {
             {
-                var x = check fooInMediate(incomingReq);
+                var x = check fooInMediate(incomingRequest);
 
                 if x is false {
                     http:Response res1 = createAcceptedResponse();
@@ -34,10 +34,10 @@ service /pizzashack/'1\.0\.0 on ep0 {
                 }
             }
 
-            http:Response res = check backendEP->post("...", incomingReq);
+            http:Response backendResponse = check backendEP->post("...", incomingRequest);
 
             {
-                var x = check fooOutMediate(res, incomingReq);
+                var x = check fooOutMediate(backendResponse, incomingRequest);
 
                 if x is false {
                     // handle stopping mediation midway
@@ -48,11 +48,11 @@ service /pizzashack/'1\.0\.0 on ep0 {
                 }
             }
 
-            check caller->respond(res);
+            check caller->respond(backendResponse);
         } on fail var e {
-            http:Response errorRes = createDefaultErrorResponse();
+            http:Response errFlowResponse = createDefaultErrorResponse();
             // call_error_flow{ };
-            check caller->respond(errorRes);
+            check caller->respond(errFlowResponse);
         }
     }
 }
@@ -65,5 +65,22 @@ function createDefaultErrorResponse() returns http:Response {
 
 function createAcceptedResponse() returns http:Response {
     return new;
+}
+
+function copyRequestHeaders(http:Request req) returns map<string|string[]> {
+    map<string|string[]> headers = {};
+    string[] headerNames = req.getHeaderNames();
+    foreach string name in headerNames {
+        string[]|http:HeaderNotFoundError headersResult = req.getHeaders(name);
+
+        if headersResult is string[] {
+            if headersResult.length() == 1 {
+                headers[name] = headersResult[0];
+            } else {
+                headers[name] = headersResult;
+            }
+        }
+    }
+    return headers;
 }
 ```
