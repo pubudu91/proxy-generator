@@ -92,35 +92,32 @@ public class ProxyGenerator {
         }
     }
 
-    private static Path getOpenAPIDefinition(String file, Path projectPath) {
-        try (ZipFile zipFile = new ZipFile(file)) {
-            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+    private static Path getOpenAPIDefinition(String file, Path projectPath) throws IOException {
+        InputStream openapiZip = getOpenAPIZipInputStream(file);
+        Path openapiFile = Files.createFile(projectPath.resolve("proxy.yaml"));
 
-
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
-
-                if (!entry.getName().endsWith("/Definitions/swagger.yaml")) {
-                    continue;
-                }
-
-                Path openapiFile = Files.createFile(projectPath.resolve("proxy.yaml"));
-
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(entry)));
-                     FileWriter writer = new FileWriter(openapiFile.toString())) {
-                    String content = reader.lines().collect(Collectors.joining(System.lineSeparator()));
-                    writer.write(content);
-                    writer.flush();
-                    return openapiFile;
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
-            throw new AssertionError("Failed to read OpenAPI definition from: " + file);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(openapiZip));
+             FileWriter writer = new FileWriter(openapiFile.toString())) {
+            String content = reader.lines().collect(Collectors.joining(System.lineSeparator()));
+            writer.write(content);
+            writer.flush();
+            return openapiFile;
         }
+    }
+
+    private static InputStream getOpenAPIZipInputStream(String file) throws IOException {
+        ZipFile zipFile = new ZipFile(file);
+        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+        while (entries.hasMoreElements()) {
+            ZipEntry entry = entries.nextElement();
+
+            if (entry.getName().endsWith("/Definitions/swagger.yaml")) {
+                return zipFile.getInputStream(entry);
+            }
+        }
+
+        throw new AssertionError("'/Definitions/swagger.yaml' file not found in the API artifact");
     }
 
     private static Path generateProject() throws IOException {
