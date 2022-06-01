@@ -31,12 +31,16 @@ public class DoBlock {
     }
 
     public DoBlock addStatement(String stmt) {
-        this.doStmts.add(stmt);
+        if (stmt != null) {
+            this.doStmts.add(stmt);
+        }
         return this;
     }
 
     public DoBlock addStatementToOnFail(String stmt) {
-        this.onFailStmts.add(stmt);
+        if (stmt != null) {
+            this.onFailStmts.add(stmt);
+        }
         return this;
     }
 

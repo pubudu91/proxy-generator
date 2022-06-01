@@ -18,6 +18,8 @@
 
 package dev.choreo.apim;
 
+import dev.choreo.apim.artifact.model.APIYaml;
+import dev.choreo.apim.artifact.model.Operation;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
@@ -26,6 +28,8 @@ import io.ballerina.tools.text.TextDocumentChange;
 import io.ballerina.tools.text.TextEdit;
 import io.ballerina.tools.text.TextLine;
 import io.ballerina.tools.text.TextRange;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.BufferedReader;
 import java.io.FileWriter;
@@ -36,7 +40,7 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Enumeration;
-import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -45,15 +49,14 @@ import static dev.choreo.apim.utils.ProjectAPIUtils.getLastLineInFile;
 
 public class ProxyGenerator {
 
-    private static final Path WORKING_DIR = Path.of(System.getProperty("user.dir"));
-
     public static void main(String[] args) throws IOException {
         // Needs to be the actual bal distribution. e.g., ballerina-2201.0.0-swan-lake/distributions/ballerina-2201.0.3
         System.setProperty("ballerina.home", args[0]);
         ProjectBuilder projectBuilder = new ProjectBuilder();
+        Map<String, Operation> operations = getAPIMetaData(getInputStreamFromZip(args[1], "/api.yaml"));
         Project project = projectBuilder
-                .initProject(WORKING_DIR)
-                .addOpenAPIDefinition(getOpenAPIZipInputStream(args[1]))
+                .initProject(Path.of(System.getProperty("user.dir")))
+                .addOpenAPIDefinition(getInputStreamFromZip(args[1], "/Definitions/swagger.yaml"))
                 .build();
         Module module = project.currentPackage().getDefaultModule();
         Document serviceDoc = getDocument(module, "proxy_service.bal");
@@ -64,26 +67,35 @@ public class ProxyGenerator {
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
         SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate());
-        docChange = transformer.modifyDoc(updatedServiceDoc, List.of("fooInMediate"), List.of("fooOutMediate"));
+        docChange = transformer.modifyDoc(updatedServiceDoc, operations);
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
         writeToFile(updatedServiceDoc, projectBuilder.getProjectPath());
     }
 
-    private static InputStream getOpenAPIZipInputStream(String file) throws IOException {
-        ZipFile zipFile = new ZipFile(file);
+    private static InputStream getInputStreamFromZip(String zipFilePath, String targetFileInZip) throws IOException {
+        ZipFile zipFile = new ZipFile(zipFilePath);
         Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
         while (entries.hasMoreElements()) {
             ZipEntry entry = entries.nextElement();
 
-            if (entry.getName().endsWith("/Definitions/swagger.yaml")) {
+            if (entry.getName().endsWith(targetFileInZip)) {
                 return zipFile.getInputStream(entry);
             }
         }
 
-        throw new AssertionError("'/Definitions/swagger.yaml' file not found in the API artifact");
+        throw new AssertionError(String.format("'%s' file not found in the API artifact", targetFileInZip));
+    }
+
+    // TODO: 2022-06-02 Refactor this. Maybe hide this behind a defined API for the API artifact.
+    private static Map<String, Operation> getAPIMetaData(InputStream in) {
+        Representer representer = new Representer();
+        representer.getPropertyUtils().setSkipMissingProperties(true);
+        Yaml yaml = new Yaml(representer);
+        APIYaml artifact = yaml.loadAs(in, APIYaml.class);
+        return artifact.getData().toOpsMap();
     }
 
     private static void writeToFile(Document doc, Path projectPath) throws IOException {
