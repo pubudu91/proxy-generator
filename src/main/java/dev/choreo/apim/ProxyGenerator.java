@@ -40,18 +40,20 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static dev.choreo.apim.utils.ProjectAPIUtils.*;
+import static dev.choreo.apim.utils.ProjectAPIUtils.getDocument;
+import static dev.choreo.apim.utils.ProjectAPIUtils.getLastLineInFile;
 
 public class ProxyGenerator {
 
     private static final Path WORKING_DIR = Path.of(System.getProperty("user.dir"));
 
     public static void main(String[] args) throws IOException {
-        setBallerinaHomeDistribution();
+        // Needs to be the actual bal distribution. e.g., ballerina-2201.0.0-swan-lake/distributions/ballerina-2201.0.3
+        System.setProperty("ballerina.home", args[0]);
         ProjectBuilder projectBuilder = new ProjectBuilder();
         Project project = projectBuilder
                 .initProject(WORKING_DIR)
-                .addOpenAPIDefinition(getOpenAPIZipInputStream(args[0]))
+                .addOpenAPIDefinition(getOpenAPIZipInputStream(args[1]))
                 .build();
         Module module = project.currentPackage().getDefaultModule();
         Document serviceDoc = getDocument(module, "proxy_service.bal");
@@ -82,26 +84,6 @@ public class ProxyGenerator {
         }
 
         throw new AssertionError("'/Definitions/swagger.yaml' file not found in the API artifact");
-    }
-
-    private static void setBallerinaHomeDistribution() {
-        ProcessBuilder builder = new ProcessBuilder();
-        builder.command(System.getenv("SHELL"), "-c", "bal home");
-
-        try {
-            Process process = builder.start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String balHome = reader.readLine();
-            int exitVal = process.waitFor();
-
-            if (exitVal != 0) {
-                throw new RuntimeException("'bal home' command exited unexpectedly");
-            }
-
-            System.setProperty("ballerina.home", balHome);
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static void writeToFile(Document doc, Path projectPath) throws IOException {
