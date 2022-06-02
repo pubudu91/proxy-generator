@@ -25,4 +25,5 @@ public class Names {
     public static final String BACKEND_RESPONSE = "backendResponse";
     public static final String ERROR_FLOW_RESPONSE = "errFlowResponse";
     public static final String UPDATED_HEADERS = "updatedHeaders";
+    public static final String ERROR = "e";
 }

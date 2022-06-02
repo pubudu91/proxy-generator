@@ -66,7 +66,8 @@ public class ProxyGenerator {
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
-        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate());
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate(),
+                                                                      getFaultFlowTemplate());
         docChange = transformer.modifyDoc(updatedServiceDoc, operations);
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
@@ -120,6 +121,10 @@ public class ProxyGenerator {
 
     private static String getOutflowTemplate() {
         return readFile("code-snippets/outflow_template.bal");
+    }
+
+    private static String getFaultFlowTemplate() {
+        return readFile("code-snippets/faultflow_template.bal");
     }
 
     private static String readFile(String filePath) {
