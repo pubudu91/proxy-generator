@@ -57,8 +57,6 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     private final String inflowTemplate;
     private final String outflowTemplate;
     private List<TextEdit> edits;
-    private List<String> policies;
-    private List<String> outflowPolicies;
     private Map<String, Operation> operations;
     private String functionName;
     private String currentOperation;
@@ -197,8 +195,14 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         for (Node pathSegment : pathSegments) {
             switch (pathSegment.kind()) {
                 case IDENTIFIER_TOKEN:
+                    String path = ((Token) pathSegment).text();
+                    if (path.startsWith("'")) {
+                        path = path.substring(1);
+                    }
+                    pathBuilder.append(path);
+                    break;
                 case SLASH_TOKEN:
-                    pathBuilder.append(((Token) pathSegment).text());
+                    pathBuilder.append("/");
                     break;
                 case RESOURCE_PATH_SEGMENT_PARAM:
                     pathBuilder.append('*');

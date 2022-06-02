@@ -37,6 +37,10 @@ public class APIData {
 
     public Map<String, Operation> toOpsMap() {
         return this.operations.stream()
-                .collect(Collectors.toMap(op -> buildOpKey(op.getVerb(), op.getTarget()), op -> op));
+                .collect(Collectors.toMap(op -> buildOpKey(op.getVerb(), modifyResourcePath(op.getTarget())), op -> op));
+    }
+
+    private String modifyResourcePath(String target) {
+        return target.replaceAll("\\{.+}", "*");
     }
 }
