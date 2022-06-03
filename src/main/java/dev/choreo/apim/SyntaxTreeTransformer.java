@@ -46,7 +46,6 @@ import java.util.Map;
 import static dev.choreo.apim.utils.Names.BACKEND_ENDPOINT;
 import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
 import static dev.choreo.apim.utils.Names.CALLER;
-import static dev.choreo.apim.utils.Names.ERROR;
 import static dev.choreo.apim.utils.Names.ERROR_FLOW_RESPONSE;
 import static dev.choreo.apim.utils.Names.INCOMING_REQUEST;
 import static dev.choreo.apim.utils.Names.UPDATED_HEADERS;
@@ -58,20 +57,25 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     private final String inflowTemplate;
     private final String outflowTemplate;
     private final String faultflowTemplate;
+    private final PolicyManager policyManager;
+    private CodeGenerator codegen;
     private List<TextEdit> edits;
     private Map<String, Operation> operations;
     private String functionName;
     private String currentOperation;
 
-    public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate, String faultflowTemplate) {
+    public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate, String faultflowTemplate,
+                                 PolicyManager policyManager) {
         this.inflowTemplate = inflowTemplate;
         this.outflowTemplate = outflowTemplate;
         this.faultflowTemplate = faultflowTemplate;
+        this.policyManager = policyManager;
     }
 
     public TextDocumentChange modifyDoc(Document document, Map<String, Operation> operations) {
         this.edits = new ArrayList<>();
         this.operations = operations;
+        this.codegen = new CodeGenerator(inflowTemplate, outflowTemplate, faultflowTemplate);
         document.syntaxTree().rootNode().accept(this);
         return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
     }
@@ -129,6 +133,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         TextRange closingBraceTR = funcBody.closeBraceToken().textRange();
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
         DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
+        // TODO: 2022-06-03 Move to code gen
         String code = doBlock
                 .addStatement(generateInflow())
                 .addStatement(getBackendHTTPCall(this.functionName))
@@ -142,6 +147,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         edits.add(body);
     }
 
+    // TODO: 2022-06-03 Move these code generation parts to the code generator
     private String generateInflow() {
         StringBuilder builder = new StringBuilder();
 
@@ -152,8 +158,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         }
 
         for (Policy policy : operation.getOperationPolicies().getRequest()) {
-            String fnCall = format("%s(%s)", policy.getPolicyName(), INCOMING_REQUEST);
-            builder.append(format(this.inflowTemplate, fnCall)).append('\n');
+            PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
+            builder.append(codegen.generateInFlowPolicyInvocation(pkg)).append('\n');
         }
 
         return builder.toString();
@@ -169,8 +175,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         }
 
         for (Policy policy : operation.getOperationPolicies().getResponse()) {
-            String fnCall = format("%s(%s, %s)", policy.getPolicyName(), BACKEND_RESPONSE, INCOMING_REQUEST);
-            builder.append(format(this.outflowTemplate, fnCall)).append('\n');
+            PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
+            builder.append(codegen.generateOutFlowPolicyInvocation(pkg)).append('\n');
         }
 
         return builder.toString();
@@ -186,9 +192,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         }
 
         for (Policy policy : operation.getOperationPolicies().getFault()) {
-            String fnCall = format("%s(%s, %s, %s, %s)", policy.getPolicyName(), ERROR_FLOW_RESPONSE, ERROR,
-                                   BACKEND_RESPONSE, INCOMING_REQUEST);
-            builder.append(format(this.faultflowTemplate, fnCall)).append('\n');
+            PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
+            builder.append(codegen.generateFaultFlowPolicyInvocation(pkg)).append('\n');
         }
 
         return builder.toString();

@@ -18,13 +18,14 @@
 
 package dev.choreo.apim.artifact.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class AttachedPolicies {
 
-    private List<Policy> request;
-    private List<Policy> response;
-    private List<Policy> fault;
+    private List<Policy> request = new ArrayList<>();
+    private List<Policy> response = new ArrayList<>();
+    private List<Policy> fault = new ArrayList<>();
 
     public List<Policy> getRequest() {
         return request;
