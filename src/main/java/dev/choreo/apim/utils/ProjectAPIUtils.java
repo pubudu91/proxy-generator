@@ -21,6 +21,7 @@ package dev.choreo.apim.utils;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
+import io.ballerina.projects.Resource;
 import io.ballerina.tools.text.TextDocument;
 import io.ballerina.tools.text.TextLine;
 
@@ -35,6 +36,19 @@ public class ProjectAPIUtils {
             Document doc = module.document(documentId);
             if (doc.name().equals(fileName)) {
                 return doc;
+            }
+        }
+
+        throw new AssertionError(String.format("File not found: %s", fileName));
+    }
+
+    public static Resource getResource(Module module, String fileName) {
+        Collection<DocumentId> resourceIds = module.resourceIds();
+
+        for (DocumentId id : resourceIds) {
+            Resource res = module.resource(id);
+            if (res.name().equals(fileName)) {
+                return res;
             }
         }
 

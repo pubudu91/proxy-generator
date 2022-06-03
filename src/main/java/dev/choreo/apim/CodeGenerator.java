@@ -18,7 +18,7 @@
 
 package dev.choreo.apim;
 
-import io.ballerina.compiler.api.symbols.FunctionSymbol;
+import com.google.gson.JsonObject;
 
 import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
 import static dev.choreo.apim.utils.Names.ERROR;
@@ -43,8 +43,8 @@ public class CodeGenerator {
             return "";
         }
 
-        FunctionSymbol func = pkg.getInFlowPolicy().get();
-        String fnCall = format("%s(%s)", func.getName().get(), INCOMING_REQUEST);
+        JsonObject func = pkg.getInFlowPolicy().get();
+        String fnCall = format("%s(%s)", func.get("name").getAsString(), INCOMING_REQUEST);
         return format(this.inflowTemplate, fnCall);
     }
 
@@ -53,8 +53,8 @@ public class CodeGenerator {
             return "";
         }
 
-        FunctionSymbol func = pkg.getOutFlowPolicy().get();
-        String fnCall = format("%s(%s, %s)", func.getName().get(), BACKEND_RESPONSE, INCOMING_REQUEST);
+        JsonObject func = pkg.getOutFlowPolicy().get();
+        String fnCall = format("%s(%s, %s)", func.get("name").getAsString(), BACKEND_RESPONSE, INCOMING_REQUEST);
         return format(this.outflowTemplate, fnCall);
     }
 
@@ -63,8 +63,8 @@ public class CodeGenerator {
             return "";
         }
 
-        FunctionSymbol func = pkg.getFaultFlowPolicy().get();
-        String fnCall = format("%s(%s, %s, %s, %s)", func.getName().get(), ERROR_FLOW_RESPONSE, ERROR,
+        JsonObject func = pkg.getFaultFlowPolicy().get();
+        String fnCall = format("%s(%s, %s, %s, %s)", func.get("name").getAsString(), ERROR_FLOW_RESPONSE, ERROR,
                                BACKEND_RESPONSE, INCOMING_REQUEST);
         return format(this.faultflowTemplate, fnCall);
     }
