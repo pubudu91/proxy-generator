@@ -43,13 +43,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static dev.choreo.apim.Names.BACKEND_ENDPOINT;
-import static dev.choreo.apim.Names.BACKEND_RESPONSE;
-import static dev.choreo.apim.Names.CALLER;
-import static dev.choreo.apim.Names.ERROR;
-import static dev.choreo.apim.Names.ERROR_FLOW_RESPONSE;
-import static dev.choreo.apim.Names.INCOMING_REQUEST;
-import static dev.choreo.apim.Names.UPDATED_HEADERS;
+import static dev.choreo.apim.utils.Names.BACKEND_ENDPOINT;
+import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
+import static dev.choreo.apim.utils.Names.CALLER;
+import static dev.choreo.apim.utils.Names.ERROR;
+import static dev.choreo.apim.utils.Names.ERROR_FLOW_RESPONSE;
+import static dev.choreo.apim.utils.Names.INCOMING_REQUEST;
+import static dev.choreo.apim.utils.Names.UPDATED_HEADERS;
 import static dev.choreo.apim.utils.Utils.buildOpKey;
 import static java.lang.String.format;
 
@@ -108,7 +108,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String paramSignature = format("http:Caller %s, http:Request %s", CALLER, Names.INCOMING_REQUEST);
+        String paramSignature = format("http:Caller %s, http:Request %s", CALLER, INCOMING_REQUEST);
         String edit = functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);

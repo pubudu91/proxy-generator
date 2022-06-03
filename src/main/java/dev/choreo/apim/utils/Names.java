@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package dev.choreo.apim;
+package dev.choreo.apim.utils;
 
 public class Names {
     public static final String INCOMING_REQUEST = "incomingRequest";
@@ -26,4 +26,9 @@ public class Names {
     public static final String ERROR_FLOW_RESPONSE = "errFlowResponse";
     public static final String UPDATED_HEADERS = "updatedHeaders";
     public static final String ERROR = "e";
+    public static final String BUILTIN_POLICY_ORG = "choreo";
+    public static final String POLICY_VALIDATOR_PKG = "policy_validator";
+    public static final String POLICY_IN_FLOW_ANNOT = "InFlow";
+    public static final String POLICY_OUT_FLOW_ANNOT = "OutFlow";
+    public static final String POLICY_FAULT_FLOW_ANNOT = "FaultFlow";
 }
