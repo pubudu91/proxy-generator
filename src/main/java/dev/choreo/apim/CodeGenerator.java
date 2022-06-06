@@ -44,7 +44,7 @@ public class CodeGenerator {
         }
 
         JsonObject func = pkg.getInFlowPolicy().get();
-        String fnCall = format("%s(%s)", func.get("name").getAsString(), INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s)", pkg.name(), func.get("name").getAsString(), INCOMING_REQUEST);
         return format(this.inflowTemplate, fnCall);
     }
 
@@ -54,7 +54,8 @@ public class CodeGenerator {
         }
 
         JsonObject func = pkg.getOutFlowPolicy().get();
-        String fnCall = format("%s(%s, %s)", func.get("name").getAsString(), BACKEND_RESPONSE, INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s, %s)", pkg.name(), func.get("name").getAsString(), BACKEND_RESPONSE,
+                               INCOMING_REQUEST);
         return format(this.outflowTemplate, fnCall);
     }
 
@@ -64,8 +65,8 @@ public class CodeGenerator {
         }
 
         JsonObject func = pkg.getFaultFlowPolicy().get();
-        String fnCall = format("%s(%s, %s, %s, %s)", func.get("name").getAsString(), ERROR_FLOW_RESPONSE, ERROR,
-                               BACKEND_RESPONSE, INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s, %s, %s, %s)", pkg.name(), func.get("name").getAsString(), ERROR_FLOW_RESPONSE,
+                               ERROR, BACKEND_RESPONSE, INCOMING_REQUEST);
         return format(this.faultflowTemplate, fnCall);
     }
 }

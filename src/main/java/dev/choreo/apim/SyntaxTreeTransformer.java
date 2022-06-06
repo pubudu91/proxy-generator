@@ -40,8 +40,10 @@ import io.ballerina.tools.text.TextEdit;
 import io.ballerina.tools.text.TextRange;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static dev.choreo.apim.utils.Names.BACKEND_ENDPOINT;
 import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
@@ -54,6 +56,7 @@ import static java.lang.String.format;
 
 public class SyntaxTreeTransformer extends NodeVisitor {
 
+    private static final TextRange START_POS = TextRange.from(0, 0);
     private final String inflowTemplate;
     private final String outflowTemplate;
     private final String faultflowTemplate;
@@ -63,6 +66,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     private Map<String, Operation> operations;
     private String functionName;
     private String currentOperation;
+    private Set<String> imports;
 
     public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate, String faultflowTemplate,
                                  PolicyManager policyManager) {
@@ -74,6 +78,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
     public TextDocumentChange modifyDoc(Document document, Map<String, Operation> operations) {
         this.edits = new ArrayList<>();
+        this.imports = new HashSet<>();
         this.operations = operations;
         this.codegen = new CodeGenerator(inflowTemplate, outflowTemplate, faultflowTemplate);
         document.syntaxTree().rootNode().accept(this);
@@ -160,6 +165,11 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         for (Policy policy : operation.getOperationPolicies().getRequest()) {
             PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
             builder.append(codegen.generateInFlowPolicyInvocation(pkg)).append('\n');
+            String pkgName = String.format("%s/%s", pkg.org(), pkg.name());
+            if (!this.imports.contains(pkgName)) {
+                this.edits.add(0, TextEdit.from(START_POS, String.format("import %s;\n", pkgName)));
+                this.imports.add(pkgName);
+            }
         }
 
         return builder.toString();
@@ -177,6 +187,11 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         for (Policy policy : operation.getOperationPolicies().getResponse()) {
             PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
             builder.append(codegen.generateOutFlowPolicyInvocation(pkg)).append('\n');
+            String pkgName = String.format("%s/%s", pkg.org(), pkg.name());
+            if (!this.imports.contains(pkgName)) {
+                this.edits.add(0, TextEdit.from(START_POS, String.format("import %s;\n", pkgName)));
+                this.imports.add(pkgName);
+            }
         }
 
         return builder.toString();
@@ -194,6 +209,11 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         for (Policy policy : operation.getOperationPolicies().getFault()) {
             PolicyPackage pkg = policyManager.get(policy.getPolicyName(), policy.getPolicyVersion());
             builder.append(codegen.generateFaultFlowPolicyInvocation(pkg)).append('\n');
+            String pkgName = String.format("%s/%s", pkg.org(), pkg.name());
+            if (!this.imports.contains(pkgName)) {
+                this.edits.add(0, TextEdit.from(START_POS, String.format("import %s;\n", pkgName)));
+                this.imports.add(pkgName);
+            }
         }
 
         return builder.toString();

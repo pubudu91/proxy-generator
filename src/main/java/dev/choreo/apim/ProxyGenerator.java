@@ -66,8 +66,11 @@ public class ProxyGenerator {
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
-        PolicyManager policyManager = new PolicyManager(
-                new PolicyPackageLoader(Paths.get(args[0]), Paths.get(System.getProperty("user.home"), ".ballerina")));
+        PolicyPackageLoader policyLoader = new PolicyPackageLoader(Paths.get(args[0]),
+                                                                   Paths.get(System.getProperty("user.home"),
+                                                                             ".ballerina"));
+        policyLoader.pullPolicies(operations.values());
+        PolicyManager policyManager = new PolicyManager(policyLoader);
         SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate(),
                                                                       getFaultFlowTemplate(), policyManager);
         docChange = transformer.modifyDoc(updatedServiceDoc, operations);

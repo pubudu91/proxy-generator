@@ -58,6 +58,14 @@ public class PolicyPackage {
         this.faultflowPolicy = policyMeta.getAsJsonObject("faultflow");
     }
 
+    public String org() {
+        return this.org;
+    }
+
+    public String name() {
+        return this.name;
+    }
+
     public Optional<JsonObject> getInFlowPolicy() {
         return Optional.ofNullable(this.inflowPolicy);
     }
