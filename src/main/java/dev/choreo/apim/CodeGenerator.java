@@ -72,7 +72,7 @@ public class CodeGenerator {
                 .addStatement(generateBackendHTTPCall(ctx))
                 .addStatement(generateOutflow(ctx))
                 .addStatement(format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
-                .addStatementToOnFail(format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
+                .addStatementToOnFail(format("http:Response %s = createDefaultErrorResponse(e);", ERROR_FLOW_RESPONSE))
                 .addStatementToOnFail(generateFaultFlow(ctx))
                 .addStatementToOnFail(format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
                 .build();

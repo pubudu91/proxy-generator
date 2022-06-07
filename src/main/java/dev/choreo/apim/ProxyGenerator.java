@@ -106,8 +106,7 @@ public class ProxyGenerator {
     }
 
     private static void writeToFile(Document doc, Path projectPath) throws IOException {
-        PrintWriter writer = new PrintWriter(new FileWriter(
-                Paths.get(projectPath.toString(), "_generated_" + doc.name()).toString()));
+        PrintWriter writer = new PrintWriter(new FileWriter(Paths.get(projectPath.toString(), doc.name()).toString()));
         writer.write(doc.textDocument().toString());
         writer.flush();
         writer.close();
