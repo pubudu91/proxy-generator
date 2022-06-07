@@ -71,9 +71,10 @@ public class ProxyGenerator {
                                                                              ".ballerina"));
         policyLoader.pullPolicies(operations.values());
         PolicyManager policyManager = new PolicyManager(policyLoader);
-        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate(),
-                                                                      getFaultFlowTemplate(), policyManager);
-        docChange = transformer.modifyDoc(updatedServiceDoc, operations);
+        CodeGenerator codegen = new CodeGenerator(getInflowTemplate(), getOutflowTemplate(),
+                                                  getFaultFlowTemplate(), policyManager, operations);
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer();
+        docChange = transformer.modifyDoc(updatedServiceDoc, codegen);
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 

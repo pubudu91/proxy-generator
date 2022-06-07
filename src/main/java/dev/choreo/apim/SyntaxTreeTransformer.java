@@ -18,8 +18,6 @@
 
 package dev.choreo.apim;
 
-import dev.choreo.apim.artifact.model.Operation;
-import dev.choreo.apim.code.builders.DoBlock;
 import io.ballerina.compiler.syntax.tree.FunctionBodyBlockNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
@@ -38,38 +36,17 @@ import io.ballerina.tools.text.TextRange;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import static dev.choreo.apim.utils.Names.BACKEND_ENDPOINT;
-import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
-import static dev.choreo.apim.utils.Names.CALLER;
-import static dev.choreo.apim.utils.Names.ERROR_FLOW_RESPONSE;
-import static dev.choreo.apim.utils.Names.INCOMING_REQUEST;
-import static dev.choreo.apim.utils.Names.UPDATED_HEADERS;
-import static java.lang.String.format;
 
 public class SyntaxTreeTransformer extends NodeVisitor {
 
     private static final TextRange START_POS = TextRange.from(0, 0);
-    private final String inflowTemplate;
-    private final String outflowTemplate;
-    private final String faultflowTemplate;
-    private final PolicyManager policyManager;
     private CodeGenerator codegen;
     private List<TextEdit> edits;
     private CodeContext ctx;
 
-    public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate, String faultflowTemplate,
-                                 PolicyManager policyManager) {
-        this.inflowTemplate = inflowTemplate;
-        this.outflowTemplate = outflowTemplate;
-        this.faultflowTemplate = faultflowTemplate;
-        this.policyManager = policyManager;
-    }
-
-    public TextDocumentChange modifyDoc(Document document, Map<String, Operation> operations) {
+    public TextDocumentChange modifyDoc(Document document, CodeGenerator codegen) {
         this.edits = new ArrayList<>();
-        this.codegen = new CodeGenerator(inflowTemplate, outflowTemplate, faultflowTemplate, policyManager, operations);
+        this.codegen = codegen;
         visitNode(document.syntaxTree().rootNode());
         this.edits.add(0, TextEdit.from(START_POS, codegen.generateImports()));
         return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
@@ -109,8 +86,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String paramSignature = format("http:Caller %s, http:Request %s", CALLER, INCOMING_REQUEST);
-        String edit = functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
+        String edit = this.codegen.modifyResourceParamSignature(functionSignature);
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);
 
@@ -120,7 +96,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
         ReturnTypeDescriptorNode returnType = functionSignature.returnTypeDesc().get();
         TextRange returnTypeRange = returnType.type().textRange();
-        TextEdit newReturnType = TextEdit.from(returnTypeRange, "error?");
+        edit = this.codegen.modifyResourceReturnSignature();
+        TextEdit newReturnType = TextEdit.from(returnTypeRange, edit);
         edits.add(newReturnType);
     }
 
@@ -129,34 +106,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         LineRange closingBraceLR = funcBody.closeBraceToken().lineRange();
         TextRange closingBraceTR = funcBody.closeBraceToken().textRange();
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
-        DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
-        // TODO: 2022-06-03 Move to code gen
-        String code = doBlock
-                .addStatement(this.codegen.generateInflow(this.ctx))
-                .addStatement(getBackendHTTPCall(this.ctx.resourceMethodName()))
-                .addStatement(this.codegen.generateOutflow(this.ctx))
-                .addStatement(format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
-                .addStatementToOnFail(format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
-                .addStatementToOnFail(this.codegen.generateFaultFlow(this.ctx))
-                .addStatementToOnFail(format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
-                .build();
+        String code = this.codegen.generateDoBlock(this.ctx, closingBraceLR.startLine().offset() / 4 + 1);
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
-    }
-
-    private String getBackendHTTPCall(String functionName) {
-        if ("get".equalsIgnoreCase(functionName)
-                || "head".equalsIgnoreCase(functionName)
-                || "options".equalsIgnoreCase(functionName)) {
-            StringBuilder builder = new StringBuilder();
-            builder.append(format("map<string|string[]> %s = copyRequestHeaders(%s);\n", UPDATED_HEADERS,
-                                  INCOMING_REQUEST));
-            builder.append(format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                                  this.ctx.resourceMethodName(), UPDATED_HEADERS));
-            return builder.toString();
-        }
-
-        return format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                      this.ctx.resourceMethodName(), INCOMING_REQUEST);
     }
 }
