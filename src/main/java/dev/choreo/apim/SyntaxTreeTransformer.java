@@ -18,21 +18,16 @@
 
 package dev.choreo.apim;
 
-import dev.choreo.apim.artifact.model.Operation;
-import dev.choreo.apim.artifact.model.Policy;
-import dev.choreo.apim.code.builders.DoBlock;
 import io.ballerina.compiler.syntax.tree.FunctionBodyBlockNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ModuleMemberDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
-import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
-import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.projects.Document;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextDocumentChange;
@@ -41,46 +36,34 @@ import io.ballerina.tools.text.TextRange;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import static dev.choreo.apim.utils.Names.BACKEND_ENDPOINT;
-import static dev.choreo.apim.utils.Names.BACKEND_RESPONSE;
-import static dev.choreo.apim.utils.Names.CALLER;
-import static dev.choreo.apim.utils.Names.ERROR;
-import static dev.choreo.apim.utils.Names.ERROR_FLOW_RESPONSE;
-import static dev.choreo.apim.utils.Names.INCOMING_REQUEST;
-import static dev.choreo.apim.utils.Names.UPDATED_HEADERS;
-import static dev.choreo.apim.utils.Utils.buildOpKey;
-import static java.lang.String.format;
 
 public class SyntaxTreeTransformer extends NodeVisitor {
 
-    private final String inflowTemplate;
-    private final String outflowTemplate;
-    private final String faultflowTemplate;
+    private static final TextRange START_POS = TextRange.from(0, 0);
+    private CodeGenerator codegen;
     private List<TextEdit> edits;
-    private Map<String, Operation> operations;
-    private String functionName;
-    private String currentOperation;
+    private CodeContext ctx;
 
-    public SyntaxTreeTransformer(String inflowTemplate, String outflowTemplate, String faultflowTemplate) {
-        this.inflowTemplate = inflowTemplate;
-        this.outflowTemplate = outflowTemplate;
-        this.faultflowTemplate = faultflowTemplate;
+    public TextDocumentChange modifyDoc(Document document, CodeGenerator codegen) {
+        this.edits = new ArrayList<>();
+        this.codegen = codegen;
+        visitNode(document.syntaxTree().rootNode());
+        this.edits.add(0, TextEdit.from(START_POS, codegen.generateImports()));
+        return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
     }
 
-    public TextDocumentChange modifyDoc(Document document, Map<String, Operation> operations) {
-        this.edits = new ArrayList<>();
-        this.operations = operations;
-        document.syntaxTree().rootNode().accept(this);
-        return TextDocumentChange.from(this.edits.toArray(new TextEdit[0]));
+    private void visitNode(Node node) {
+        CodeContext prevCtx = this.ctx;
+        this.ctx = new CodeContext(prevCtx, node);
+        node.accept(this);
+        this.ctx = prevCtx;
     }
 
     @Override
     public void visit(ModulePartNode modulePartNode) {
         for (ModuleMemberDeclarationNode member : modulePartNode.members()) {
             if (member.kind() == SyntaxKind.SERVICE_DECLARATION) {
-                member.accept(this);
+                visitNode(member);
             }
         }
     }
@@ -89,27 +72,21 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     public void visit(ServiceDeclarationNode serviceDeclarationNode) {
         for (Node member : serviceDeclarationNode.members()) {
             if (member.kind() == SyntaxKind.RESOURCE_ACCESSOR_DEFINITION) {
-                member.accept(this);
+                visitNode(member);
             }
         }
     }
 
     @Override
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
-        this.functionName = functionDefinitionNode.functionName().text();
-        this.currentOperation = buildOpKey(this.functionName,
-                                           getResourcePath(functionDefinitionNode.relativeResourcePath()));
-        functionDefinitionNode.functionSignature().accept(this);
-        functionDefinitionNode.functionBody().accept(this);
-        this.functionName = null;
-        this.currentOperation = null;
+        visitNode(functionDefinitionNode.functionSignature());
+        visitNode(functionDefinitionNode.functionBody());
     }
 
     @Override
     public void visit(FunctionSignatureNode functionSignature) {
         TextRange cursorPos = TextRange.from(functionSignature.openParenToken().textRange().endOffset(), 0);
-        String paramSignature = format("http:Caller %s, http:Request %s", CALLER, INCOMING_REQUEST);
-        String edit = functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
+        String edit = this.codegen.modifyResourceParamSignature(functionSignature);
         TextEdit params = TextEdit.from(cursorPos, edit);
         edits.add(params);
 
@@ -119,7 +96,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
         ReturnTypeDescriptorNode returnType = functionSignature.returnTypeDesc().get();
         TextRange returnTypeRange = returnType.type().textRange();
-        TextEdit newReturnType = TextEdit.from(returnTypeRange, "error?");
+        edit = this.codegen.modifyResourceReturnSignature();
+        TextEdit newReturnType = TextEdit.from(returnTypeRange, edit);
         edits.add(newReturnType);
     }
 
@@ -128,114 +106,8 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         LineRange closingBraceLR = funcBody.closeBraceToken().lineRange();
         TextRange closingBraceTR = funcBody.closeBraceToken().textRange();
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
-        DoBlock doBlock = new DoBlock(closingBraceLR.startLine().offset() / 4 + 1);
-        String code = doBlock
-                .addStatement(generateInflow())
-                .addStatement(getBackendHTTPCall(this.functionName))
-                .addStatement(generateOutflow())
-                .addStatement(format("check %s->respond(%s);", CALLER, BACKEND_RESPONSE))
-                .addStatementToOnFail(format("http:Response %s = createDefaultErrorResponse();", ERROR_FLOW_RESPONSE))
-                .addStatementToOnFail(generateFaultFlow())
-                .addStatementToOnFail(format("check %s->respond(%s);", CALLER, ERROR_FLOW_RESPONSE))
-                .build();
+        String code = this.codegen.generateDoBlock(this.ctx, closingBraceLR.startLine().offset() / 4 + 1);
         TextEdit body = TextEdit.from(start, code);
         edits.add(body);
-    }
-
-    private String generateInflow() {
-        StringBuilder builder = new StringBuilder();
-
-        Operation operation = this.operations.get(this.currentOperation);
-
-        if (operation == null || operation.getOperationPolicies().getRequest().isEmpty()) {
-            return null;
-        }
-
-        for (Policy policy : operation.getOperationPolicies().getRequest()) {
-            String fnCall = format("%s(%s)", policy.getPolicyName(), INCOMING_REQUEST);
-            builder.append(format(this.inflowTemplate, fnCall)).append('\n');
-        }
-
-        return builder.toString();
-    }
-
-    private String generateOutflow() {
-        StringBuilder builder = new StringBuilder();
-
-        Operation operation = this.operations.get(this.currentOperation);
-
-        if (operation == null || operation.getOperationPolicies().getResponse().isEmpty()) {
-            return null;
-        }
-
-        for (Policy policy : operation.getOperationPolicies().getResponse()) {
-            String fnCall = format("%s(%s, %s)", policy.getPolicyName(), BACKEND_RESPONSE, INCOMING_REQUEST);
-            builder.append(format(this.outflowTemplate, fnCall)).append('\n');
-        }
-
-        return builder.toString();
-    }
-
-    private String generateFaultFlow() {
-        StringBuilder builder = new StringBuilder();
-
-        Operation operation = this.operations.get(this.currentOperation);
-
-        if (operation == null || operation.getOperationPolicies().getFault().isEmpty()) {
-            return null;
-        }
-
-        for (Policy policy : operation.getOperationPolicies().getFault()) {
-            String fnCall = format("%s(%s, %s, %s, %s)", policy.getPolicyName(), ERROR_FLOW_RESPONSE, ERROR,
-                                   BACKEND_RESPONSE, INCOMING_REQUEST);
-            builder.append(format(this.faultflowTemplate, fnCall)).append('\n');
-        }
-
-        return builder.toString();
-    }
-
-    private String getBackendHTTPCall(String functionName) {
-        if ("get".equalsIgnoreCase(functionName)
-                || "head".equalsIgnoreCase(functionName)
-                || "options".equalsIgnoreCase(functionName)) {
-            StringBuilder builder = new StringBuilder();
-            builder.append(format("map<string|string[]> %s = copyRequestHeaders(%s);\n", UPDATED_HEADERS,
-                                  INCOMING_REQUEST));
-            builder.append(format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                                  this.functionName, UPDATED_HEADERS));
-            return builder.toString();
-        }
-
-        return format("http:Response %s = check %s->%s(\"...\", %s);\n", BACKEND_RESPONSE, BACKEND_ENDPOINT,
-                      this.functionName, INCOMING_REQUEST);
-    }
-
-    private String getResourcePath(NodeList<Node> pathSegments) {
-        StringBuilder pathBuilder = new StringBuilder("/");
-
-        for (Node pathSegment : pathSegments) {
-            switch (pathSegment.kind()) {
-                case IDENTIFIER_TOKEN:
-                    String path = ((Token) pathSegment).text();
-                    if (path.startsWith("'")) {
-                        path = path.substring(1);
-                    }
-                    pathBuilder.append(path);
-                    break;
-                case SLASH_TOKEN:
-                    pathBuilder.append("/");
-                    break;
-                case RESOURCE_PATH_SEGMENT_PARAM:
-                    pathBuilder.append('*');
-                    break;
-                case RESOURCE_PATH_REST_PARAM:
-                    pathBuilder.append("**");
-                    break;
-                default:
-                    throw new AssertionError("Unexpected syntax kind: " + pathSegment.kind());
-            }
-        }
-
-        return pathBuilder.toString();
     }
 }

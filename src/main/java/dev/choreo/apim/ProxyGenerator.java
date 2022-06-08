@@ -66,9 +66,15 @@ public class ProxyGenerator {
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
-        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer(getInflowTemplate(), getOutflowTemplate(),
-                                                                      getFaultFlowTemplate());
-        docChange = transformer.modifyDoc(updatedServiceDoc, operations);
+        PolicyPackageLoader policyLoader = new PolicyPackageLoader(Paths.get(args[0]),
+                                                                   Paths.get(System.getProperty("user.home"),
+                                                                             ".ballerina"));
+        policyLoader.pullPolicies(operations.values());
+        PolicyManager policyManager = new PolicyManager(policyLoader);
+        CodeGenerator codegen = new CodeGenerator(getInflowTemplate(), getOutflowTemplate(),
+                                                  getFaultFlowTemplate(), policyManager, operations);
+        SyntaxTreeTransformer transformer = new SyntaxTreeTransformer();
+        docChange = transformer.modifyDoc(updatedServiceDoc, codegen);
         txtDoc = txtDoc.apply(docChange);
         updatedServiceDoc = updatedServiceDoc.modify().withContent(txtDoc.toString()).apply();
 
@@ -100,8 +106,7 @@ public class ProxyGenerator {
     }
 
     private static void writeToFile(Document doc, Path projectPath) throws IOException {
-        PrintWriter writer = new PrintWriter(new FileWriter(
-                Paths.get(projectPath.toString(), "_generated_" + doc.name()).toString()));
+        PrintWriter writer = new PrintWriter(new FileWriter(Paths.get(projectPath.toString(), doc.name()).toString()));
         writer.write(doc.textDocument().toString());
         writer.flush();
         writer.close();
