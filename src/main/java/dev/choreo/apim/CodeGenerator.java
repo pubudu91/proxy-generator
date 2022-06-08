@@ -18,10 +18,10 @@
 
 package dev.choreo.apim;
 
-import com.google.gson.JsonObject;
 import dev.choreo.apim.artifact.model.Operation;
 import dev.choreo.apim.artifact.model.Policy;
 import dev.choreo.apim.code.builders.DoBlock;
+import io.ballerina.compiler.api.symbols.FunctionSymbol;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 
 import java.util.HashSet;
@@ -162,8 +162,8 @@ public class CodeGenerator {
         if (pkg.getInFlowPolicy().isEmpty()) {
             return "";
         }
-        JsonObject func = pkg.getInFlowPolicy().get();
-        String fnCall = format("%s:%s(%s)", pkg.name(), func.get("name").getAsString(), INCOMING_REQUEST);
+        FunctionSymbol func = pkg.getInFlowPolicy().get();
+        String fnCall = format("%s:%s(%s)", pkg.name(), func.getName().get(), INCOMING_REQUEST);
         return format(this.inflowTemplate, fnCall);
     }
 
@@ -171,8 +171,8 @@ public class CodeGenerator {
         if (pkg.getOutFlowPolicy().isEmpty()) {
             return "";
         }
-        JsonObject func = pkg.getOutFlowPolicy().get();
-        String fnCall = format("%s:%s(%s, %s)", pkg.name(), func.get("name").getAsString(), BACKEND_RESPONSE,
+        FunctionSymbol func = pkg.getOutFlowPolicy().get();
+        String fnCall = format("%s:%s(%s, %s)", pkg.name(), func.getName().get(), BACKEND_RESPONSE,
                                INCOMING_REQUEST);
         return format(this.outflowTemplate, fnCall);
     }
@@ -181,8 +181,8 @@ public class CodeGenerator {
         if (pkg.getFaultFlowPolicy().isEmpty()) {
             return "";
         }
-        JsonObject func = pkg.getFaultFlowPolicy().get();
-        String fnCall = format("%s:%s(%s, %s, %s, %s)", pkg.name(), func.get("name").getAsString(), ERROR_FLOW_RESPONSE,
+        FunctionSymbol func = pkg.getFaultFlowPolicy().get();
+        String fnCall = format("%s:%s(%s, %s, %s, %s)", pkg.name(), func.getName().get(), ERROR_FLOW_RESPONSE,
                                ERROR, BACKEND_RESPONSE, INCOMING_REQUEST);
         return format(this.faultflowTemplate, fnCall);
     }
