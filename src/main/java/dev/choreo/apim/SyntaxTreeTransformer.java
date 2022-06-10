@@ -106,8 +106,12 @@ public class SyntaxTreeTransformer extends NodeVisitor {
         LineRange closingBraceLR = funcBody.closeBraceToken().lineRange();
         TextRange closingBraceTR = funcBody.closeBraceToken().textRange();
         TextRange start = TextRange.from(closingBraceTR.startOffset() - closingBraceLR.startLine().offset(), 0);
-        String code = this.codegen.generateDoBlock(this.ctx, closingBraceLR.startLine().offset() / 4 + 1);
-        TextEdit body = TextEdit.from(start, code);
-        edits.add(body);
+        int nTabs = closingBraceLR.startLine().offset() / 4 + 1;
+
+        String medCtx = this.codegen.generateMediationContextRecord(this.ctx);
+        edits.add(TextEdit.from(start, medCtx));
+
+        String code = this.codegen.generateDoBlock(this.ctx, nTabs);
+        edits.add(TextEdit.from(start, code));
     }
 }

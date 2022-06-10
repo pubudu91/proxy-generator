@@ -31,4 +31,8 @@ public class Names {
     public static final String POLICY_IN_FLOW_ANNOT = "InFlow";
     public static final String POLICY_OUT_FLOW_ANNOT = "OutFlow";
     public static final String POLICY_FAULT_FLOW_ANNOT = "FaultFlow";
+    public static final String MEDIATION_CONTEXT_TYPE = "MediationContext";
+    public static final String MEDIATION_CONTEXT_VAR = "mediationCtx";
+    public static final String MEDIATION_CONTEXT_HTTP_METHOD = MEDIATION_CONTEXT_VAR + ".httpMethod";
+    public static final String MEDIATION_CONTEXT_RESOURCE_PATH = MEDIATION_CONTEXT_VAR + ".resourcePath";
 }
