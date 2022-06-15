@@ -210,7 +210,8 @@ public class CodeGenerator {
             return "";
         }
         FunctionSymbol func = pkg.getInFlowPolicy().get();
-        String fnCall = format("%s:%s(%s)", pkg.name(), func.getName().get(), INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s, %s)", pkg.name(), func.getName().get(), INCOMING_REQUEST,
+                               MEDIATION_CONTEXT_VAR);
         return format(this.inflowTemplate, fnCall);
     }
 
@@ -219,8 +220,8 @@ public class CodeGenerator {
             return "";
         }
         FunctionSymbol func = pkg.getOutFlowPolicy().get();
-        String fnCall = format("%s:%s(%s, %s)", pkg.name(), func.getName().get(), BACKEND_RESPONSE,
-                               INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s, %s, %s)", pkg.name(), func.getName().get(), BACKEND_RESPONSE,
+                               INCOMING_REQUEST, MEDIATION_CONTEXT_VAR);
         return format(this.outflowTemplate, fnCall);
     }
 
@@ -229,8 +230,8 @@ public class CodeGenerator {
             return "";
         }
         FunctionSymbol func = pkg.getFaultFlowPolicy().get();
-        String fnCall = format("%s:%s(%s, %s, %s, %s)", pkg.name(), func.getName().get(), ERROR_FLOW_RESPONSE,
-                               ERROR, BACKEND_RESPONSE, INCOMING_REQUEST);
+        String fnCall = format("%s:%s(%s, %s, %s, %s, %s)", pkg.name(), func.getName().get(), ERROR_FLOW_RESPONSE,
+                               ERROR, BACKEND_RESPONSE, INCOMING_REQUEST, MEDIATION_CONTEXT_VAR);
         return format(this.faultflowTemplate, fnCall);
     }
 
