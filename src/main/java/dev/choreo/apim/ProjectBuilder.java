@@ -82,12 +82,13 @@ class ProjectBuilder {
 
     private void generateService(Path openAPIDef, Path projectPath) {
         ProcessBuilder builder = new ProcessBuilder();
-        builder.command(System.getenv("SHELL"), "-c",
-                        String.format("bal openapi -i %s -o %s --mode service", openAPIDef.toString(),
-                                      projectPath.toString()));
+        builder.command("bal", "openapi", "-i", openAPIDef.toString(), "-o", projectPath.toString(), "--mode",
+                        "service");
 
         try {
             Process process = builder.start();
+            InputStream inputStream = process.getErrorStream();
+            inputStream.transferTo(System.err);
             int exitVal = process.waitFor();
 
             if (exitVal != 0) {

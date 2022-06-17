@@ -25,9 +25,8 @@ import io.ballerina.projects.ProjectEnvironmentBuilder;
 import io.ballerina.projects.bala.BalaProject;
 import io.ballerina.projects.repos.FileSystemCache;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -76,13 +75,13 @@ public class PolicyPackageLoader {
         }
 
         ProcessBuilder builder = new ProcessBuilder();
-        builder.command(System.getenv("SHELL"), "-c",
-                        String.format("bal pull %s/%s:%s", nameCmpts[0], nameCmpts[1], policy.getPolicyVersion()));
+        builder.command("bal", "pull",
+                        String.format("%s/%s:%s", nameCmpts[0], nameCmpts[1], policy.getPolicyVersion()));
 
         try {
             Process process = builder.start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            System.out.println(reader.readLine());
+            InputStream inputStream = process.getErrorStream();
+            inputStream.transferTo(System.err);
             int exitVal = process.waitFor();
 
             if (exitVal != 0) {
