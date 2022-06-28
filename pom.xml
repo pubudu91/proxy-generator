@@ -95,6 +95,6 @@
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
-        <ballerina.version>2201.0.0</ballerina.version>
+        <ballerina.version>2201.0.4</ballerina.version>
     </properties>
 </project>
