@@ -26,7 +26,7 @@ public class Names {
     public static final String ERROR_FLOW_RESPONSE = "errFlowResponse";
     public static final String UPDATED_HEADERS = "updatedHeaders";
     public static final String ERROR = "e";
-    public static final String BUILTIN_POLICY_ORG = "pubudu";
+    public static final String BUILTIN_POLICY_ORG = System.getProperty("policy.org");
     public static final String POLICY_VALIDATOR_PKG = "policy_validator";
     public static final String POLICY_IN_FLOW_ANNOT = "InFlow";
     public static final String POLICY_OUT_FLOW_ANNOT = "OutFlow";
