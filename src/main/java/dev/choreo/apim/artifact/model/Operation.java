@@ -25,7 +25,7 @@ public class Operation {
     private String id;
     private String target;
     private String verb;
-    private AttachedPolicies operationPolicies;
+    private AttachedPolicies operationPolicies = new AttachedPolicies();
 
     public String getId() {
         return id;
