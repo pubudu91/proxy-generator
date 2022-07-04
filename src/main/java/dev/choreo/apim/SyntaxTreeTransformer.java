@@ -21,6 +21,8 @@ package dev.choreo.apim;
 import io.ballerina.compiler.syntax.tree.FunctionBodyBlockNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
+import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
+import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ModuleMemberDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
@@ -62,7 +64,7 @@ public class SyntaxTreeTransformer extends NodeVisitor {
     @Override
     public void visit(ModulePartNode modulePartNode) {
         for (ModuleMemberDeclarationNode member : modulePartNode.members()) {
-            if (member.kind() == SyntaxKind.SERVICE_DECLARATION) {
+            if (member.kind() == SyntaxKind.SERVICE_DECLARATION || member.kind() == SyntaxKind.LISTENER_DECLARATION) {
                 visitNode(member);
             }
         }
@@ -113,5 +115,14 @@ public class SyntaxTreeTransformer extends NodeVisitor {
 
         String code = this.codegen.generateDoBlock(this.ctx, nTabs);
         edits.add(TextEdit.from(start, code));
+    }
+
+    @Override
+    public void visit(ListenerDeclarationNode listenerDeclarationNode) {
+        ImplicitNewExpressionNode initializer = (ImplicitNewExpressionNode) listenerDeclarationNode.initializer();
+        int start = initializer.parenthesizedArgList().get().openParenToken().textRange().endOffset();
+        int i = initializer.parenthesizedArgList().get().closeParenToken().textRange().startOffset();
+        String code = this.codegen.modifyListener();
+        edits.add(TextEdit.from(TextRange.from(start, i - start), code));
     }
 }

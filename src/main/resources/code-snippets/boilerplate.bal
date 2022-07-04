@@ -1,5 +1,5 @@
 
-final http:Client backendEP = check new("http://localhost:9090");
+final http:Client backendEP = check new("%s");
 
 function createDefaultErrorResponse(error e) returns http:Response {
     return new;

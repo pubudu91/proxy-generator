@@ -18,6 +18,9 @@
 
 package dev.choreo.apim.artifact.model;
 
+import dev.choreo.apim.utils.MediationCodeGenException;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,7 +28,8 @@ import java.util.stream.Collectors;
 import static dev.choreo.apim.utils.Utils.buildOpKey;
 
 public class APIData {
-    private List<Operation> operations;
+    private List<Operation> operations = new ArrayList<>();
+    private EndpointConfig endpointConfig;
 
     public List<Operation> getOperations() {
         return operations;
@@ -35,9 +39,21 @@ public class APIData {
         this.operations = operations;
     }
 
+    public EndpointConfig getEndpointConfig() {
+        if (this.endpointConfig == null) {
+            throw new MediationCodeGenException("Endpoint configuration unavailable");
+        }
+        return this.endpointConfig;
+    }
+
+    public void setEndpointConfig(EndpointConfig endpointConfig) {
+        this.endpointConfig = endpointConfig;
+    }
+
     public Map<String, Operation> toOpsMap() {
         return this.operations.stream()
-                .collect(Collectors.toMap(op -> buildOpKey(op.getVerb(), modifyResourcePath(op.getTarget())), op -> op));
+                .collect(
+                        Collectors.toMap(op -> buildOpKey(op.getVerb(), modifyResourcePath(op.getTarget())), op -> op));
     }
 
     private String modifyResourcePath(String target) {

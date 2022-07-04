@@ -68,6 +68,10 @@ public class CodeGenerator {
         this.imports = new HashSet<>();
     }
 
+    public String modifyListener() {
+        return "9090";
+    }
+
     public String modifyResourceParamSignature(FunctionSignatureNode functionSignature) {
         return functionSignature.parameters().isEmpty() ? paramSignature : paramSignature + ", ";
     }

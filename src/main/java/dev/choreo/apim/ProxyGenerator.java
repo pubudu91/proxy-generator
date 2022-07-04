@@ -19,6 +19,7 @@
 package dev.choreo.apim;
 
 import dev.choreo.apim.artifact.model.APIYaml;
+import dev.choreo.apim.artifact.model.EndpointConfig;
 import dev.choreo.apim.artifact.model.Operation;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
@@ -53,7 +54,8 @@ public class ProxyGenerator {
         // Needs to be the actual bal distribution. e.g., ballerina-2201.0.0-swan-lake/distributions/ballerina-2201.0.3
         System.setProperty("ballerina.home", args[0]);
         ProjectBuilder projectBuilder = new ProjectBuilder();
-        Map<String, Operation> operations = getAPIMetaData(getInputStreamFromZip(args[1], "/api.yaml"));
+        APIYaml artifact = getAPIArtifact(getInputStreamFromZip(args[1], "/api.yaml"));
+        Map<String, Operation> operations = artifact.getData().toOpsMap();
         Project project = projectBuilder
                 .initProject(Path.of(System.getProperty("user.dir")))
                 .addOpenAPIDefinition(getInputStreamFromZip(args[1], "/Definitions/swagger.yaml"))
@@ -62,7 +64,7 @@ public class ProxyGenerator {
         Document serviceDoc = getDocument(module, "proxy_service.bal");
         TextDocument txtDoc = serviceDoc.textDocument();
 
-        TextDocumentChange docChange = getCodeSnippets(serviceDoc);
+        TextDocumentChange docChange = getCodeSnippets(serviceDoc, artifact.getData().getEndpointConfig());
         txtDoc = txtDoc.apply(docChange);
         Document updatedServiceDoc = serviceDoc.modify().withContent(txtDoc.toString()).apply();
 
@@ -97,12 +99,11 @@ public class ProxyGenerator {
     }
 
     // TODO: 2022-06-02 Refactor this. Maybe hide this behind a defined API for the API artifact.
-    private static Map<String, Operation> getAPIMetaData(InputStream in) {
+    private static APIYaml getAPIArtifact(InputStream in) {
         Representer representer = new Representer();
         representer.getPropertyUtils().setSkipMissingProperties(true);
         Yaml yaml = new Yaml(representer);
-        APIYaml artifact = yaml.loadAs(in, APIYaml.class);
-        return artifact.getData().toOpsMap();
+        return yaml.loadAs(in, APIYaml.class);
     }
 
     private static void writeToFile(Document doc, Path projectPath) throws IOException {
@@ -112,8 +113,9 @@ public class ProxyGenerator {
         writer.close();
     }
 
-    private static TextDocumentChange getCodeSnippets(Document doc) {
-        String content = readFile("code-snippets/boilerplate.bal");
+    private static TextDocumentChange getCodeSnippets(Document doc, EndpointConfig endpointConfig) {
+        String content = String.format(readFile("code-snippets/boilerplate.bal"),
+                                       endpointConfig.getProduction_endpoints().getUrl());
         TextLine line = getLastLineInFile(doc.textDocument());
         TextRange textRange = TextRange.from(line.endOffset(), 0);
         TextEdit edit = TextEdit.from(textRange, content);
