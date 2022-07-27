@@ -6,7 +6,7 @@
 
     <groupId>dev.choreo.apim</groupId>
     <artifactId>proxy-generator</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <scm>
@@ -95,6 +95,6 @@
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
-        <ballerina.version>2201.0.4</ballerina.version>
+        <ballerina.version>2201.1.0</ballerina.version>
     </properties>
 </project>
